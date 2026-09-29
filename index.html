@@ -512,13 +512,24 @@
     return data.session;
   }
 
-  const authReady = ensureAuthSession().catch((err) => {
+  // authReady는 재로그인이 필요할 때 다시 만들 수 있도록 let으로 둡니다.
+  // 최초 로그인 시도가 네트워크 문제 등으로 실패하면 이 프라미스가 영원히
+  // reject 상태로 남는데, 그걸 그대로 캐싱해버리면 새로고침 전까지 모든
+  // CRUD 함수가 계속 실패합니다. getCurrentUserId가 실패를 감지하면
+  // 스스로 다시 로그인 시도를 하도록 해서 이 문제를 막습니다.
+  let authReady = ensureAuthSession().catch((err) => {
     console.error('Supabase 익명 로그인 실패:', err);
     throw err;
   });
 
   async function getCurrentUserId() {
-    await authReady; // 로그인이 끝날 때까지 기다렸다가
+    try {
+      await authReady; // 로그인이 끝날 때까지 기다렸다가
+    } catch {
+      // 이전 로그인 시도가 실패한 상태로 남아있다면 한 번 더 시도합니다.
+      authReady = ensureAuthSession();
+      await authReady;
+    }
     const { data: { user }, error } = await supabaseClient.auth.getUser();
     if (error) throw error;
     if (!user) throw new Error('로그인된 사용자가 없습니다.');
