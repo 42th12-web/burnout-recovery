@@ -494,11 +494,44 @@
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_diUw8pS4zDrxvRZBFaY10g_8GNgyerI';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
+  // ---------------------------------------------------------------------
+  // 익명 인증
+  // 이 서비스엔 회원가입/로그인 화면이 없으므로, 방문자마다 Supabase의
+  // 익명 사용자로 자동 로그인시켜서 auth.uid()를 발급받습니다. RLS 정책들이
+  // 전부 auth.uid() 기준으로 소유자를 판별하므로, 이게 있어야 CRUD가 동작합니다.
+  // (Supabase 대시보드 > Authentication > Providers에서 Anonymous sign-ins가
+  // 켜져 있어야 합니다.)
+  // ---------------------------------------------------------------------
+  async function ensureAuthSession() {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    if (session) return session;
+
+    const { data, error: signInError } = await supabaseClient.auth.signInAnonymously();
+    if (signInError) throw signInError;
+    return data.session;
+  }
+
+  const authReady = ensureAuthSession().catch((err) => {
+    console.error('Supabase 익명 로그인 실패:', err);
+    throw err;
+  });
+
+  async function getCurrentUserId() {
+    await authReady; // 로그인이 끝날 때까지 기다렸다가
+    const { data: { user }, error } = await supabaseClient.auth.getUser();
+    if (error) throw error;
+    if (!user) throw new Error('로그인된 사용자가 없습니다.');
+    return user.id;
+  }
+
   // 아래 함수들은 5개 테이블에 대한 기본 CRUD 뼈대입니다.
   // 지금 데모 흐름(로컬 상태만 사용)에는 아직 연결돼 있지 않으니,
   // 실제 저장이 필요한 지점(analyzeBtn, interruptBtn, saveRestBtn 등)에서 호출해 붙이면 됩니다.
+  // user_id는 매번 직접 넘기지 않고, 현재 로그인된(익명 포함) 사용자에서 자동으로 가져옵니다.
 
-  async function createTask({ userId, title, energyLevel }) {
+  async function createTask({ title, energyLevel }) {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabaseClient
       .from('tasks')
       .insert({ user_id: userId, title, energy_level: energyLevel })
@@ -569,7 +602,8 @@
     return data;
   }
 
-  async function upsertUserStats(userId, { avgFocusDurationSec, recommendedTimeboxSec }) {
+  async function upsertUserStats({ avgFocusDurationSec, recommendedTimeboxSec }) {
+    const userId = await getCurrentUserId();
     const { error } = await supabaseClient.from('user_stats').upsert({
       user_id: userId,
       avg_focus_duration_sec: avgFocusDurationSec,
