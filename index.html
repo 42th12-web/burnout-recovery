@@ -199,6 +199,7 @@
   }
   .timer-card .cur-task{font-size:13.5px;font-weight:700;text-align:center;max-width:26ch;line-height:1.4;}
   .timer-card .reco{font-size:11px;color:var(--moss-300);font-weight:600;}
+  .timer-card .timebox-note{font-size:11px;color:var(--moss-300);font-weight:600;opacity:.9;}
   .timer-controls{display:flex;gap:8px;margin-top:10px;width:100%;}
   .timer-controls button{flex:1;}
   .btn-on-dark{
@@ -364,6 +365,7 @@
           <span class="warm-tag">지금 진행 중</span>
           <div class="cur-task" id="curTaskLabel">아직 시작한 과제가 없어요</div>
           <div class="timer-num" id="timerNum">00:00</div>
+          <div class="timebox-note" id="timeboxNote">기록이 쌓이면 맞춤 시간이 추천돼요</div>
           <div class="reco" id="recoText">과제를 먼저 입력해 주세요</div>
           <div class="timer-controls">
             <button class="btn-on-dark" id="timerToggle" disabled>시작</button>
@@ -632,6 +634,31 @@
     };
   }
 
+  async function fetchUserStats() {
+    const userId = await getCurrentUserId();
+    const { data, error } = await supabaseClient
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data; // 없으면 null
+  }
+
+  // 추천 시간 계산 대상: 중단(was_interrupted=true)으로 끝났고 ended_at이 있으며 집중 시간이 minFocusSec 이상인 최근 세션
+  async function fetchRecentInterruptedSessions({ limit, minFocusSec }) {
+    const { data, error } = await supabaseClient
+      .from('sessions')
+      .select('id, started_at, ended_at, focus_duration_sec, was_interrupted')
+      .eq('was_interrupted', true)
+      .not('ended_at', 'is', null)
+      .gte('focus_duration_sec', minFocusSec)
+      .order('ended_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data;
+  }
+
   async function upsertUserStats({ avgFocusDurationSec, recommendedTimeboxSec }) {
     const userId = await getCurrentUserId();
     const { error } = await supabaseClient.from('user_stats').upsert({
@@ -774,11 +801,8 @@
       activeItem ? activeItem.dataset.title : '모든 마이크로 과제를 끝냈어요';
     document.getElementById('recoText').textContent =
       !activeItem ? '오늘은 여기까지, 충분히 했어요' : isWarmup ? '가볍게 시작하는 워밍업이에요' : '지금은 이것만 하면 돼요';
-    plannedSec = activeItem ? Number(activeItem.dataset.duration) * 60 : 0;
-    // 흐르는 중이면 지금까지 흐른 시간을 세션에 먼저 반영한 뒤, 과제용 카운트다운만 0으로 되돌린다
-    if(runStartedAt !== null){ sessionFocusMs += Date.now() - runStartedAt; runStartedAt = Date.now(); }
-    itemFocusMs = 0;
-    finished = false;
+    // 타이머는 세션 단위 타임박스라서 진행 과제가 바뀌어도 시간을 리셋하지 않는다
+    plannedSec = activeItem ? timeboxSec : 0;
     render();
     updateTimerControls();
     if(!activeItem && sessionId) finishSession(); // 마지막 과제까지 체크하면 세션도 정상 종료
@@ -792,6 +816,7 @@
       const rows = await fetchMicroTasks(task.id);
       if(!rows.length) return;
       const snap = await fetchLatestSnapshotForTask(task.id);
+      await statsReady;
       // 복원하는 동안 사용자가 이미 새 과제를 만들기 시작했다면 덮어쓰지 않는다
       if(analyzing) return;
       const onInput = document.querySelector('.screen.active').dataset.screen === 'input';
@@ -841,6 +866,7 @@
       await saveMicroTasks(task.id, DUMMY_MICRO_TASKS);
       const rows = await fetchMicroTasks(task.id);
       if(!rows.length) throw new Error('저장한 마이크로 과제를 불러오지 못했어요.');
+      await statsReady;
       renderTasks(task, rows);
       showScreen('tasks');
     } catch (err) {
@@ -979,6 +1005,7 @@
       if(!interruptTx.ended){
         await endSession(sid, { focusDurationSec: focusSec, wasInterrupted: true });
         interruptTx.ended = true;
+        await recomputeUserStatsSafe(); // 실패해도 중단 저장은 계속 진행
       }
       await saveSnapshot({
         sessionId: sid,
@@ -986,7 +1013,8 @@
         noteText: document.getElementById('pauseMemo').value.trim(),
         reentryAction,
       });
-      sessionId = null; sessionFocusMs = 0; itemFocusMs = 0; finished = false;
+      sessionId = null; sessionFocusMs = 0; finished = false;
+      syncPlannedSec();
       render(); updateTimerControls();
       showScreen('resting');
     } catch (err) {
@@ -1046,19 +1074,90 @@
   const interruptBtn = document.getElementById('interruptBtn');
 
   let currentTask = null;     // 지금 2번 화면에 그려진 tasks 행
-  let plannedSec = 0;         // 진행 중 마이크로 과제의 예정 시간(초). 진행 중인 과제가 없으면 0
+  let plannedSec = 0;         // 이번 세션의 타임박스(초). 진행 중인 마이크로 과제가 없으면 0
   let sessionId = null;       // DB sessions.id. "시작"을 눌러야 생긴다
   let runStartedAt = null;    // 흐르는 중이면 시작 시각(ms), 멈춰 있으면 null
   let sessionFocusMs = 0;     // 이 세션에서 일시정지를 뺀 실제 집중 시간
-  let itemFocusMs = 0;        // 현재 마이크로 과제 카운트다운에 쓴 시간 (진행 과제가 바뀌면 0)
   let finished = false;       // 카운트다운이 0:00에 도달해 세션이 종료된 상태
   let tickId = null;
   let starting = false;
   let finishing = false;
 
+  // ---------------------------------------------------------------------
+  // 추천 타임박스 (평균 몰입 시간)
+  // 중단으로 끝난 세션만 평균에 넣는다. 정상 종료(완주)한 세션까지 넣으면, 완주할수록
+  // 평균이 타임박스 근처로 굳거나 줄어들어 추천 시간이 계속 짧아지는 문제가 생긴다.
+  // ---------------------------------------------------------------------
+  const STATS = {
+    DEFAULT_AVG_SEC: 900,   // 대상 세션이 부족할 때 쓰는 평균
+    RATIO: 0.8,             // 평균의 80%를 추천
+    MIN_TIMEBOX_SEC: 300,
+    MAX_TIMEBOX_SEC: 1500,
+    MIN_SAMPLES: 3,         // 이 개수 이상일 때만 실제 평균을 쓴다
+    RECENT_COUNT: 5,
+    MIN_FOCUS_SEC: 30,      // 이보다 짧은 중단은 기록에서 제외
+  };
+  const DEFAULT_TIMEBOX_SEC = STATS.DEFAULT_AVG_SEC * STATS.RATIO; // user_stats가 없을 때 720초
+
+  // sessions: 세션 행 배열 → { avgFocusDurationSec, recommendedTimeboxSec, sampleCount }
+  function computeRecommendedTimebox(sessions){
+    const used = sessions
+      .filter(r => r.was_interrupted === true && r.ended_at && r.focus_duration_sec >= STATS.MIN_FOCUS_SEC)
+      .sort((a, b) => new Date(b.ended_at) - new Date(a.ended_at))
+      .slice(0, STATS.RECENT_COUNT);
+    const avg = used.length >= STATS.MIN_SAMPLES
+      ? used.reduce((sum, r) => sum + r.focus_duration_sec, 0) / used.length
+      : STATS.DEFAULT_AVG_SEC;
+    const timebox = Math.min(STATS.MAX_TIMEBOX_SEC, Math.max(STATS.MIN_TIMEBOX_SEC, avg * STATS.RATIO));
+    return { avgFocusDurationSec: Math.round(avg), recommendedTimeboxSec: Math.round(timebox), sampleCount: used.length };
+  }
+
+  let timeboxSec = DEFAULT_TIMEBOX_SEC;
+  let statsReady = Promise.resolve();
+
+  function syncPlannedSec(){ plannedSec = currentActiveId ? timeboxSec : 0; }
+
+  function applyTimebox(sec, sampleCount){
+    timeboxSec = sec;
+    document.getElementById('timeboxNote').textContent = sampleCount >= STATS.MIN_SAMPLES
+      ? `추천 시간 ${formatDuration(sec)} (최근 ${sampleCount}회 중단 기록 기준)`
+      : '기록이 쌓이면 맞춤 시간이 추천돼요';
+    if(!sessionId){      // 진행 중인 세션의 시간은 바꾸지 않고, 다음 세션부터 적용
+      syncPlannedSec();
+      render(); updateTimerControls();
+    }
+  }
+
+  async function loadUserStats(){
+    const [stats, recent] = await Promise.all([
+      fetchUserStats(),
+      fetchRecentInterruptedSessions({ limit: STATS.RECENT_COUNT, minFocusSec: STATS.MIN_FOCUS_SEC }),
+    ]);
+    applyTimebox(stats ? stats.recommended_timebox_sec : DEFAULT_TIMEBOX_SEC, recent.length);
+  }
+
+  // 중단 세션이 저장된 직후 호출: 다시 계산해서 user_stats에 저장
+  async function recomputeUserStats(){
+    const recent = await fetchRecentInterruptedSessions({ limit: STATS.RECENT_COUNT, minFocusSec: STATS.MIN_FOCUS_SEC });
+    const stats = computeRecommendedTimebox(recent);
+    await upsertUserStats({
+      avgFocusDurationSec: stats.avgFocusDurationSec,
+      recommendedTimeboxSec: stats.recommendedTimeboxSec,
+    });
+    applyTimebox(stats.recommendedTimeboxSec, stats.sampleCount);
+  }
+  async function recomputeUserStatsSafe(){
+    try {
+      await recomputeUserStats();
+    } catch (err) {
+      console.error('추천 시간 갱신 실패:', err);
+      showToast('추천 시간을 갱신하지 못했어요. 중단 기록은 저장됐어요.');
+    }
+  }
+
   const runningDelta = () => runStartedAt === null ? 0 : Date.now() - runStartedAt;
   const sessionFocusSecNow = () => Math.round((sessionFocusMs + runningDelta()) / 1000);
-  const remainingSec = () => finished ? 0 : Math.max(0, Math.ceil(plannedSec - (itemFocusMs + runningDelta()) / 1000));
+  const remainingSec = () => finished ? 0 : Math.max(0, Math.ceil(plannedSec - (sessionFocusMs + runningDelta()) / 1000));
 
   function render(){
     const r = remainingSec();
@@ -1080,7 +1179,7 @@
   function stopRun(){
     if(runStartedAt !== null){
       const d = Date.now() - runStartedAt;
-      sessionFocusMs += d; itemFocusMs += d;
+      sessionFocusMs += d;
       runStartedAt = null;
     }
     clearInterval(tickId); tickId = null;
@@ -1091,12 +1190,12 @@
   function resetTimerState(task){
     stopRun();
     currentTask = task;
-    sessionId = null; sessionFocusMs = 0; itemFocusMs = 0; finished = false;
+    sessionId = null; sessionFocusMs = 0; finished = false;
   }
 
   function tick(){
     render();
-    if(plannedSec > 0 && itemFocusMs + runningDelta() >= plannedSec * 1000) finishSession();
+    if(plannedSec > 0 && sessionFocusMs + runningDelta() >= plannedSec * 1000) finishSession();
   }
 
   // "시작": sessions 행을 만들고 session_id를 보관한다
@@ -1106,7 +1205,8 @@
     try {
       const session = await startSession(currentTask.id);
       sessionId = session.id;
-      sessionFocusMs = 0; itemFocusMs = 0; finished = false;
+      sessionFocusMs = 0; finished = false;
+      plannedSec = timeboxSec;
       startRun();
     } catch (err) {
       console.error('세션 시작 저장 실패:', err);
@@ -1125,7 +1225,7 @@
     const sid = sessionId, focusSec = sessionFocusSecNow();
     try {
       await endSession(sid, { focusDurationSec: focusSec, wasInterrupted: false });
-      sessionId = null; sessionFocusMs = 0; itemFocusMs = 0;
+      sessionId = null; sessionFocusMs = 0;
       finished = true;
       showToast('타이머가 끝났어요. 집중한 시간을 저장했어요.', 'info');
     } catch (err) {
@@ -1146,8 +1246,12 @@
       await endSession(sid, { focusDurationSec: focusSec, wasInterrupted: true });
     } catch (err) {
       console.error('이전 세션 정리 실패:', err);
+      sessionId = null; sessionFocusMs = 0;
+      return;
     }
-    sessionId = null; sessionFocusMs = 0; itemFocusMs = 0;
+    await recomputeUserStatsSafe(); // 중단으로 저장된 세션이므로 추천 시간도 갱신
+    sessionId = null; sessionFocusMs = 0;
+    syncPlannedSec();
   }
 
   toggleBtn.addEventListener('click', ()=>{
@@ -1159,5 +1263,9 @@
   render();
   updateTimerControls();
 
+  statsReady = loadUserStats().catch(err => {
+    console.error('추천 시간 불러오기 실패:', err);
+    showToast('추천 시간을 불러오지 못했어요. 기본 시간을 사용해요.');
+  });
   restoreLatestTask();
 </script>
