@@ -268,6 +268,7 @@
     display:flex;flex-direction:column;gap:10px;
   }
   .snapshot-card .row{display:flex;gap:9px;align-items:flex-start;}
+  .snapshot-card .row[hidden]{display:none;}
   .snapshot-card .k{font-size:11px;font-weight:800;color:var(--forest-600);text-transform:uppercase;letter-spacing:.05em;min-width:64px;padding-top:1px;}
   .snapshot-card .v{font-size:13px;color:var(--ink);line-height:1.5;}
 
@@ -431,24 +432,24 @@
 
         <div class="stat-row">
           <div class="stat-tile">
-            <span class="num" id="statMin">24분</span><span class="lbl">오늘 누적 집중</span>
-            <span class="breakdown" id="statMinBreakdown">이전 24분 + 이번 세션 0분</span>
+            <span class="num" id="statMin">-</span><span class="lbl">오늘 집중 시간</span>
+            <span class="breakdown" id="statMinBreakdown"></span>
           </div>
           <div class="stat-tile">
-            <span class="num" id="statCount">1개</span><span class="lbl">오늘 완료한 마이크로 과제</span>
-            <span class="breakdown" id="statCountBreakdown">이전 1개 + 이번 세션 0개</span>
+            <span class="num" id="statCount">-</span><span class="lbl">성공한 마이크로 과제</span>
+            <span class="breakdown" id="statCountBreakdown"></span>
           </div>
         </div>
 
         <div class="snapshot-card">
-          <div class="row"><span class="k">하던 일</span><span class="v" id="snapTask">서론 목적 2문장 작성하기</span></div>
-          <div class="row"><span class="k">남긴 메모</span><span class="v" id="snapMemo">메모 없음</span></div>
-          <div class="row"><span class="k">다음 행동</span><span class="v" id="snapNext">실험 방법 표 이어서 채우기</span></div>
+          <div class="row" id="snapTaskRow"><span class="k">하던 일</span><span class="v" id="snapTask"></span></div>
+          <div class="row" id="snapMemoRow" hidden><span class="k">남긴 메모</span><span class="v" id="snapMemo"></span></div>
+          <div class="row"><span class="k">다음 행동</span><span class="v" id="snapNext">저장된 중단 기록이 없어요</span></div>
         </div>
 
         <p class="quote-line">"지금 잠을 자면 꿈을 꾸지만, 지금 5분만 채우면 꿈에 가까워져요."</p>
         <div class="spacer"></div>
-        <button class="btn-primary">이어서 시작하기</button>
+        <button class="btn-primary" id="reentryStartBtn">이어서 시작하기</button>
       </div>
     </section>
 
@@ -606,13 +607,29 @@
     // snapshots에는 task_id가 없으므로 sessions를 거쳐 조회합니다.
     const { data, error } = await supabaseClient
       .from('snapshots')
-      .select('*, sessions!inner(task_id)')
+      .select('*, sessions!inner(task_id, was_interrupted)')
       .eq('sessions.task_id', taskId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
     if (error) throw error;
     return data;
+  }
+
+  // 오늘(브라우저 로컬 시간 0시 이후)에 시작한 세션들의 집중 시간 합계.
+  // sessions에는 user_id가 없지만 RLS가 본인 과제의 세션만 돌려준다.
+  async function fetchTodayFocus() {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const { data, error } = await supabaseClient
+      .from('sessions')
+      .select('focus_duration_sec')
+      .gte('started_at', midnight.toISOString());
+    if (error) throw error;
+    return {
+      totalSec: data.reduce((sum, r) => sum + (r.focus_duration_sec || 0), 0),
+      count: data.length,
+    };
   }
 
   async function upsertUserStats({ avgFocusDurationSec, recommendedTimeboxSec }) {
@@ -635,7 +652,10 @@
     b.textContent = labels[s];
     b.dataset.target = s;
     if(i===0) b.classList.add('active');
-    b.addEventListener('click', ()=> showScreen(s));
+    b.addEventListener('click', ()=>{
+      showScreen(s);
+      if(s === 'reentry') loadReentry().catch(err => console.error('복귀 정보 불러오기 실패:', err));
+    });
     nav.appendChild(b);
   });
 
@@ -648,7 +668,6 @@
     });
     if(name !== 'tasks') pauseTimer();
     if(name === 'interrupt'){ interruptTx = { ended: false, focusSec: null }; updateInterruptStats(); }
-    if(name === 'reentry') updateReentryStats();
   }
 
   // energy selection
@@ -723,6 +742,7 @@
       `${ENERGY_LABEL[task.energy_level]} 컨디션 · ${microTasks.length}개 마이크로 과제`;
     document.getElementById('taskList').replaceChildren(...microTasks.map(buildTaskItem));
     resetTimerState(task);
+    forcedActiveId = null;
     currentActiveId = undefined; // 처음 그릴 때는 타이머 카드를 무조건 갱신
     refreshTaskState();
   }
@@ -731,7 +751,9 @@
   let currentActiveId = undefined;
   function refreshTaskState(){
     const items = [...document.querySelectorAll('#taskList .task-item')];
-    const activeItem = items.find(el => !el.classList.contains('done')) || null;
+    const firstOpen = items.find(el => !el.classList.contains('done')) || null;
+    const forced = forcedActiveId ? items.find(el => el.dataset.id === forcedActiveId && !el.classList.contains('done')) : null;
+    const activeItem = forced || firstOpen;
 
     items.forEach(el => {
       const done = el.classList.contains('done');
@@ -769,11 +791,24 @@
       if(!task) return;
       const rows = await fetchMicroTasks(task.id);
       if(!rows.length) return;
+      const snap = await fetchLatestSnapshotForTask(task.id);
       // 복원하는 동안 사용자가 이미 새 과제를 만들기 시작했다면 덮어쓰지 않는다
       if(analyzing) return;
       const onInput = document.querySelector('.screen.active').dataset.screen === 'input';
       renderTasks(task, rows);
-      if(onInput) showScreen('tasks');
+
+      // 중단으로 끝난 세션의 스냅샷이고 아직 확인하지 않았다면 복귀 화면을 먼저 보여 준다
+      let showBrief = false;
+      if(snap && snap.sessions && snap.sessions.was_interrupted === true && snap.id !== getSeenSnapshotId()){
+        try {
+          await loadReentry(snap);
+          showBrief = true;
+        } catch (err) {
+          console.error('복귀 브리핑 불러오기 실패:', err);
+          showToast('복귀 정보를 불러오지 못했어요.');
+        }
+      }
+      if(onInput) showScreen(showBrief ? 'reentry' : 'tasks');
     } catch (err) {
       console.error('이전 과제 복원 실패:', err);
       showToast('이전 과제를 불러오지 못했어요.');
@@ -826,8 +861,6 @@
   document.getElementById('retryBtn').addEventListener('click', runAnalyze);
 
   // real session tracking (so the numbers on later screens match what actually happened)
-  const TODAY_BASE_MIN = 24;   // 오늘 이전에 이미 쌓인 다른 세션들의 누적치(가정)
-  const TODAY_BASE_COUNT = 1;  // 오늘 이전 세션에서 이미 완료한 마이크로 과제 수(가정)
   // "이번 세션 완료"는 이 페이지를 연 뒤 직접 체크한 항목만 센다 (복원된 이전 완료분 제외)
   function completedInSession(){ return document.querySelectorAll('#taskList .task-item.done[data-session-done]').length; }
   function formatDuration(sec){
@@ -843,16 +876,61 @@
       sec >= 1 ? `괜찮아요, ${formatDuration(sec)} 동안 집중했어요` : '괜찮아요, 여기까지도 잘했어요';
     document.getElementById('sessionChip').textContent = `이번 세션 완료 ${completedInSession()}개`;
   }
-  function updateReentryStats(){
-    const pageSec = pageFocusSec();
-    const sessionMin = Math.floor(pageSec/60);
-    const sessionMinLabel = pageSec < 60 ? '1분 미만' : `${sessionMin}분`;
-    const sessionCount = completedInSession();
-    document.getElementById('statMin').textContent = `${TODAY_BASE_MIN + sessionMin}분`;
-    document.getElementById('statCount').textContent = `${TODAY_BASE_COUNT + sessionCount}개`;
-    document.getElementById('statMinBreakdown').textContent = `이전 ${TODAY_BASE_MIN}분 + 이번 세션 ${sessionMinLabel}`;
-    document.getElementById('statCountBreakdown').textContent = `이전 ${TODAY_BASE_COUNT}개 + 이번 세션 ${sessionCount}개`;
+
+  // ---- 복귀 브리핑(재진입 화면) ----
+  function formatFocusHM(sec){
+    if(sec <= 0) return '0분';
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    if(h > 0) return `${h}시간 ${m}분`;
+    return m === 0 ? '1분 미만' : `${m}분`;
   }
+
+  // "한 번 확인한 스냅샷"은 이 브라우저에 id를 기록해 두고 다시 띄우지 않는다.
+  // 익명 사용자 자체가 이 브라우저의 localStorage 세션에 묶여 있으므로 DB 컬럼 없이 같은 범위를 지킨다.
+  const SEEN_SNAPSHOT_KEY = 'lastSeenSnapshotId';
+  function getSeenSnapshotId(){
+    try { return localStorage.getItem(SEEN_SNAPSHOT_KEY); } catch { return null; }
+  }
+  function markSnapshotSeen(id){
+    try { localStorage.setItem(SEEN_SNAPSHOT_KEY, id); } catch (err) { console.error('확인한 스냅샷 기록 실패:', err); }
+  }
+
+  let reentrySnapshot = null; // 지금 재진입 화면에 채워진 스냅샷
+  let forcedActiveId = null;  // "이어서 시작하기" 뒤에 진행 중으로 보여 줄 마이크로 과제 id
+
+  // DB 값으로 재진입 화면을 채운다. preloaded를 주면 그 스냅샷을 쓰고, 없으면 최신 스냅샷을 조회한다.
+  async function loadReentry(preloaded){
+    if(!currentTask) throw new Error('불러온 과제가 없습니다.');
+    const [snap, today, micro] = await Promise.all([
+      preloaded ? Promise.resolve(preloaded) : fetchLatestSnapshotForTask(currentTask.id),
+      fetchTodayFocus(),
+      fetchMicroTasks(currentTask.id),
+    ]);
+    reentrySnapshot = snap;
+
+    document.getElementById('statMin').textContent = formatFocusHM(today.totalSec);
+    document.getElementById('statMinBreakdown').textContent = `오늘 세션 ${today.count}개 합계`;
+    document.getElementById('statCount').textContent = `${micro.filter(m => m.is_done).length}개`;
+    document.getElementById('statCountBreakdown').textContent = `이 과제 ${micro.length}개 중`;
+
+    const lastItem = snap && micro.find(m => m.id === snap.last_active_micro_task_id);
+    document.getElementById('snapTaskRow').hidden = !lastItem;
+    document.getElementById('snapTask').textContent = lastItem ? lastItem.title : '';
+    const note = snap && snap.note_text ? snap.note_text.trim() : '';
+    document.getElementById('snapMemoRow').hidden = !note;
+    document.getElementById('snapMemo').textContent = note;
+    document.getElementById('snapNext').textContent = snap ? snap.reentry_action : '저장된 중단 기록이 없어요';
+    return snap;
+  }
+
+  document.getElementById('reentryStartBtn').addEventListener('click', ()=>{
+    if(reentrySnapshot){
+      markSnapshotSeen(reentrySnapshot.id);
+      forcedActiveId = reentrySnapshot.last_active_micro_task_id || null;
+      refreshTaskState();
+    }
+    showScreen('tasks');
+  });
 
   // interrupt flow
   const nextActionInput = document.getElementById('nextAction');
@@ -908,7 +986,6 @@
         noteText: document.getElementById('pauseMemo').value.trim(),
         reentryAction,
       });
-      bankedFocusSec += focusSec;
       sessionId = null; sessionFocusMs = 0; itemFocusMs = 0; finished = false;
       render(); updateTimerControls();
       showScreen('resting');
@@ -921,13 +998,14 @@
       saveBtn.disabled = false;
     }
   });
-  document.getElementById('resumeBtn').addEventListener('click', ()=>{
-    updateReentryStats();
-    document.getElementById('snapTask').textContent = document.getElementById('frozenTaskLabel').textContent;
-    const memo = document.getElementById('pauseMemo').value.trim();
-    document.getElementById('snapMemo').textContent = memo || '메모 없음';
-    document.getElementById('snapNext').textContent = document.getElementById('nextAction').value.trim() || '다음 행동을 남기지 않았어요';
-    showScreen('reentry');
+  document.getElementById('resumeBtn').addEventListener('click', async ()=>{
+    try {
+      await loadReentry();
+      showScreen('reentry');
+    } catch (err) {
+      console.error('복귀 정보 불러오기 실패:', err);
+      showToast('복귀 정보를 불러오지 못했어요. 다시 눌러 주세요.');
+    }
   });
 
   // checkbox toggling
@@ -973,7 +1051,6 @@
   let runStartedAt = null;    // 흐르는 중이면 시작 시각(ms), 멈춰 있으면 null
   let sessionFocusMs = 0;     // 이 세션에서 일시정지를 뺀 실제 집중 시간
   let itemFocusMs = 0;        // 현재 마이크로 과제 카운트다운에 쓴 시간 (진행 과제가 바뀌면 0)
-  let bankedFocusSec = 0;     // 이 페이지에서 이미 끝난 세션들의 집중 초 합계 (통계 표시용)
   let finished = false;       // 카운트다운이 0:00에 도달해 세션이 종료된 상태
   let tickId = null;
   let starting = false;
@@ -981,7 +1058,6 @@
 
   const runningDelta = () => runStartedAt === null ? 0 : Date.now() - runStartedAt;
   const sessionFocusSecNow = () => Math.round((sessionFocusMs + runningDelta()) / 1000);
-  const pageFocusSec = () => bankedFocusSec + sessionFocusSecNow();
   const remainingSec = () => finished ? 0 : Math.max(0, Math.ceil(plannedSec - (itemFocusMs + runningDelta()) / 1000));
 
   function render(){
@@ -1015,7 +1091,7 @@
   function resetTimerState(task){
     stopRun();
     currentTask = task;
-    sessionId = null; sessionFocusMs = 0; itemFocusMs = 0; bankedFocusSec = 0; finished = false;
+    sessionId = null; sessionFocusMs = 0; itemFocusMs = 0; finished = false;
   }
 
   function tick(){
@@ -1049,7 +1125,6 @@
     const sid = sessionId, focusSec = sessionFocusSecNow();
     try {
       await endSession(sid, { focusDurationSec: focusSec, wasInterrupted: false });
-      bankedFocusSec += focusSec;
       sessionId = null; sessionFocusMs = 0; itemFocusMs = 0;
       finished = true;
       showToast('타이머가 끝났어요. 집중한 시간을 저장했어요.', 'info');
