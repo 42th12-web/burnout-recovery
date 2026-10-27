@@ -719,7 +719,7 @@
     toastTimer = setTimeout(()=> el.classList.remove('show'), 4500);
   }
 
-  // AI 분해 연결 전까지 쓰는 더미 마이크로 과제 (첫 단계는 항상 워밍업)
+  // AI 분해가 실패했을 때 대신 쓰는 기본 마이크로 과제 (첫 단계는 항상 워밍업)
   const DUMMY_MICRO_TASKS = [
     { order_index: 1, title: '워밍업 · 관련 자료 훑어보고 주제 정하기', duration_min: 5 },
     { order_index: 2, title: '핵심 내용 3줄로 정리하기', duration_min: 8 },
@@ -727,6 +727,34 @@
     { order_index: 4, title: '빠진 부분에 표시해 두기', duration_min: 7 },
     { order_index: 5, title: '처음부터 한 번 읽고 다듬기', duration_min: 6 },
   ];
+
+  const ENERGY_UNIT = { tired: '5분 이하', normal: '5~10분', great: '10~20분' };
+  const DECOMPOSE_TIMEOUT_MS = 25000;
+
+  // 서버리스 함수(/api/decompose)에 AI 분해를 요청한다. 어떤 이유로든 쓸 수 없으면 throw.
+  // Anthropic 키는 서버에만 있고, 브라우저는 과제명과 컨디션만 보낸다.
+  async function decomposeWithAI(taskTitle, energyLevel){
+    const controller = new AbortController();
+    const timer = setTimeout(()=> controller.abort(), DECOMPOSE_TIMEOUT_MS);
+    try {
+      const res = await fetch('/api/decompose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskTitle, energyLevel }),
+        signal: controller.signal,
+      });
+      if(!res.ok) throw new Error(`/api/decompose 응답 ${res.status}`);
+      const data = await res.json();
+      const tasks = data && data.tasks;
+      const valid = Array.isArray(tasks) && tasks.length > 0 && tasks.every(t =>
+        t && typeof t.title === 'string' && t.title.trim() !== '' &&
+        Number.isInteger(t.duration_min) && t.duration_min > 0);
+      if(!valid) throw new Error('/api/decompose 응답 형식이 올바르지 않아요.');
+      return tasks.map((t, i) => ({ order_index: i + 1, title: t.title.trim(), duration_min: t.duration_min }));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   function buildTaskItem(m, i){
     const item = document.createElement('div');
@@ -857,18 +885,31 @@
     analyzeBtn.disabled = true;
     await abandonOpenSession();
     document.getElementById('loadingDesc').textContent =
-      `"${title}"을(를) ${ENERGY_LABEL[selectedEnergy]} 컨디션에 맞는 5~10분 단위 행동으로 나누는 중이에요`;
+      `"${title}"을(를) ${ENERGY_LABEL[selectedEnergy]} 컨디션에 맞는 ${ENERGY_UNIT[selectedEnergy]} 단위 행동으로 나누는 중이에요`;
     showScreen('loading');
 
     let task = null;
     try {
+      // AI 호출이 오래 걸려도 DB에 빈 과제가 남지 않도록, 분해를 먼저 받고 그다음에 저장한다.
+      // AI가 실패해도 서비스가 멈추지 않도록 기본 과제로 대체한다.
+      let microTasks;
+      let usedFallback = false;
+      try {
+        microTasks = await decomposeWithAI(title, selectedEnergy);
+      } catch (aiErr) {
+        console.error('AI 분해 실패, 기본 과제로 대체해요:', aiErr);
+        microTasks = DUMMY_MICRO_TASKS;
+        usedFallback = true;
+      }
+
       task = await createTask({ title, energyLevel: selectedEnergy });
-      await saveMicroTasks(task.id, DUMMY_MICRO_TASKS);
+      await saveMicroTasks(task.id, microTasks);
       const rows = await fetchMicroTasks(task.id);
       if(!rows.length) throw new Error('저장한 마이크로 과제를 불러오지 못했어요.');
       await statsReady;
       renderTasks(task, rows);
       showScreen('tasks');
+      if(usedFallback) showToast('AI 분해에 실패해서 기본 과제로 시작해요');
     } catch (err) {
       console.error('과제 저장/불러오기 실패:', err);
       if(task){
