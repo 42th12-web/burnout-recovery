@@ -6,6 +6,7 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const UPSTREAM_TIMEOUT_MS = 20000;
 const MAX_TOKENS = 1024;
+const LOG_TEXT_MAX = 300; // 서버 로그에 남기는 오류 문구의 최대 길이
 
 const TASK_TITLE_MAX = 100; // index.html 과제명 입력창의 maxlength와 같게 맞춘다
 const ITEM_TITLE_MAX = 100;
@@ -101,7 +102,33 @@ function parseAndValidateTasks(text, energyLevel) {
   return tasks;
 }
 
-async function callModel(apiKey, prompt) {
+// 서버 로그에 남기는 문자열을 정리한다: 한 줄로 만들고, 비밀값(API 키, 과제명)이 섞여 있으면 가리고, 길이를 제한한다.
+function toLogText(value, secrets) {
+  if (typeof value !== 'string' || !value.trim()) return '(없음)';
+  let text = value.replace(/\s+/g, ' ').trim();
+  for (const secret of secrets) {
+    if (typeof secret === 'string' && secret.length >= 3) text = text.split(secret).join('[redacted]');
+  }
+  text = text.replace(/sk-ant-[A-Za-z0-9_-]+/g, '[redacted]');
+  return text.length > LOG_TEXT_MAX ? `${text.slice(0, LOG_TEXT_MAX)}…` : text;
+}
+
+// Anthropic 오류 응답 본문에서 error.type과 error.message만 꺼낸다. 요청 내용이나 헤더는 다루지 않는다.
+async function readApiError(res, secrets) {
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    // 본문이 JSON이 아니면 아래에서 '(없음)'으로 기록한다
+  }
+  const error = body && typeof body === 'object' ? body.error : null;
+  return {
+    type: toLogText(error && error.type, secrets),
+    message: toLogText(error && error.message, secrets),
+  };
+}
+
+async function callModel(apiKey, prompt, secrets) {
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
@@ -118,7 +145,8 @@ async function callModel(apiKey, prompt) {
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
   if (!res.ok) {
-    const err = codedError('upstream_error', `Anthropic API 응답 ${res.status}`);
+    const { type, message } = await readApiError(res, secrets);
+    const err = codedError('upstream_error', `status=${res.status} type=${type} message=${message}`);
     err.status = res.status;
     throw err;
   }
@@ -162,7 +190,7 @@ async function handler(req, res) {
   }
 
   try {
-    const text = await callModel(apiKey, buildPrompt(taskTitle, energyLevel));
+    const text = await callModel(apiKey, buildPrompt(taskTitle, energyLevel), [apiKey, taskTitle]);
     const tasks = parseAndValidateTasks(text, energyLevel);
     return res.status(200).json({ tasks });
   } catch (err) {
