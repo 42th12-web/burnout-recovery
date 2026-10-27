@@ -153,15 +153,9 @@
     padding:13px;cursor:pointer;transition:.15s;
   }
   .btn-ghost:hover{border-color:var(--clay-600);color:var(--clay-600);}
-  .btn-text{
-    appearance:none;border:none;background:none;color:var(--ink-soft);font-weight:700;
-    font-size:12.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:0;
-    font-family:'Manrope',sans-serif;
-  }
-  .btn-text:hover{color:var(--clay-600);}
   .spacer{flex:1;}
 
-  /* --- Screen 2/2b: loading / fallback --- */
+  /* --- Screen 2: loading / 6: resting 공용 --- */
   .center-stack{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;}
   .ring{
     width:56px;height:56px;border-radius:50%;
@@ -171,16 +165,11 @@
   @media (prefers-reduced-motion: reduce){ .ring{animation-duration:2.4s;} }
   @keyframes spin{to{transform:rotate(360deg);}}
   .center-stack h3{font-size:17px;color:var(--forest-900);font-weight:600;}
-  .center-stack p{margin:0;color:var(--ink-soft);font-size:13px;max-width:26ch;line-height:1.6;}
+  .center-stack p{margin:0;color:var(--ink-soft);font-size:13px;max-width:26ch;line-height:1.6;overflow-wrap:anywhere;}
   .moon{font-size:38px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.15));}
-  .fallback-badge{
-    display:inline-flex;align-items:center;gap:6px;background:var(--clay-100);
-    color:var(--clay-600);font-weight:700;font-size:11.5px;padding:6px 12px;
-    border-radius:999px;
-  }
 
   /* --- Screen 3: task list + timer --- */
-  .task-header h2{font-size:19px;color:var(--forest-900);font-weight:600;}
+  .task-header h2{font-size:19px;color:var(--forest-900);font-weight:600;overflow-wrap:anywhere;}
   .task-header .meta{font-size:12px;color:var(--ink-soft);margin-top:4px;font-weight:600;}
 
   .timer-card{
@@ -197,7 +186,7 @@
     font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;
     font-size:44px;font-weight:600;letter-spacing:.01em;margin-top:8px;
   }
-  .timer-card .cur-task{font-size:13.5px;font-weight:700;text-align:center;max-width:26ch;line-height:1.4;}
+  .timer-card .cur-task{font-size:13.5px;font-weight:700;text-align:center;max-width:26ch;line-height:1.4;overflow-wrap:anywhere;}
   .timer-card .reco{font-size:11px;color:var(--moss-300);font-weight:600;}
   .timer-card .timebox-note{font-size:11px;color:var(--moss-300);font-weight:600;opacity:.9;}
   .timer-controls{display:flex;gap:8px;margin-top:10px;width:100%;}
@@ -227,7 +216,7 @@
   .task-item.done .task-check{background:var(--forest-600);border-color:var(--forest-600);}
   .task-item.active .task-check{border-color:var(--forest-600);}
   .task-body{flex:1;min-width:0;}
-  .task-title{font-size:13px;font-weight:700;color:var(--ink);line-height:1.4;}
+  .task-title{font-size:13px;font-weight:700;color:var(--ink);line-height:1.4;overflow-wrap:anywhere;}
   .task-item.done .task-title{text-decoration:line-through;color:var(--ink-soft);}
   .task-sub{display:flex;gap:6px;align-items:center;margin-top:3px;}
   .task-time{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
@@ -271,7 +260,7 @@
   .snapshot-card .row{display:flex;gap:9px;align-items:flex-start;}
   .snapshot-card .row[hidden]{display:none;}
   .snapshot-card .k{font-size:11px;font-weight:800;color:var(--forest-600);text-transform:uppercase;letter-spacing:.05em;min-width:64px;padding-top:1px;}
-  .snapshot-card .v{font-size:13px;color:var(--ink);line-height:1.5;}
+  .snapshot-card .v{font-size:13px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere;min-width:0;}
 
   .empty-note{margin:0;padding:18px 4px;font-size:12.5px;color:var(--ink-soft);text-align:center;line-height:1.6;}
   .toast{
@@ -292,9 +281,9 @@
 </style>
 
 <div class="page-head">
-  <div class="eyebrow">UI 워크스루 · 7개 화면 상태</div>
+  <div class="eyebrow">UI 워크스루 · 6개 화면 상태</div>
   <h1>다시, 책상</h1>
-  <p>과제 입력부터 재진입 브리핑까지 실제 인터랙션이 동작하는 화면입니다. 지난 검토에서 나온 수정사항 — 타이머·예상시간 일치, 워밍업 표시, 진행 중 항목 강조, 비상 휴식 정의, 오늘 누적 통계 분리, 로딩·실패 상태 — 을 반영했습니다.</p>
+  <p>과제 입력부터 재진입 브리핑까지 실제 인터랙션이 동작하는 화면입니다. 지난 검토에서 나온 수정사항 — 타이머·예상시간 일치, 워밍업 표시, 진행 중 항목 강조, 비상 휴식 정의, 오늘 누적 통계 분리, 로딩 상태 — 을 반영했습니다.</p>
 </div>
 
 <nav class="nav" id="nav"></nav>
@@ -308,7 +297,7 @@
         <div class="topline"><span><span class="dot"></span>새 과제</span><span>1 / 7</span></div>
         <div class="greet">
           <h2>어떤 과제를 해야 하나요?</h2>
-          <p>크게 적어도 괜찮아요. 작게 나누는 건 AI가 도와줄게요.</p>
+          <p>크게 적어도 괜찮아요. 작게 나누는 건 여기서 도와줄게요.</p>
         </div>
         <div class="field">
           <label for="taskInput">과제명</label>
@@ -323,31 +312,18 @@
           </div>
         </div>
         <div class="spacer"></div>
-        <button class="btn-primary" id="analyzeBtn">✏️ AI로 과제 분해하기</button>
+        <button class="btn-primary" id="analyzeBtn">✏️ 과제 나누기</button>
       </div>
     </section>
 
-    <!-- 2. 분석중 -->
+    <!-- 2. 나누는 중 -->
     <section class="screen" data-screen="loading">
       <div class="screen-pad">
-        <div class="topline"><span><span class="dot"></span>분석 중</span><span>2 / 7</span></div>
+        <div class="topline"><span><span class="dot"></span>나누는 중</span><span>2 / 7</span></div>
         <div class="center-stack">
-          <div class="ring" role="status" aria-label="분석 중"></div>
-          <h3>AI가 과제를 살펴보고 있어요</h3>
+          <div class="ring" role="status" aria-label="나누는 중"></div>
+          <h3>과제를 나누고 있어요</h3>
           <p id="loadingDesc">"물리 수행평가 보고서 작성"을 보통 컨디션에 맞는<br>5~10분 단위 행동으로 나누는 중이에요</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 2b. 분석 실패 대체 -->
-    <section class="screen" data-screen="fallback">
-      <div class="screen-pad">
-        <div class="topline"><span><span class="dot" style="background:var(--clay-600)"></span>대체 분해</span><span>2 / 7</span></div>
-        <div class="center-stack">
-          <span class="fallback-badge">⚠ AI 연결 지연</span>
-          <h3>대신 기본 순서로 나눴어요</h3>
-          <p>자료 확인 → 개요 → 초안 → 검토 순서의<br>기본 템플릿을 사용했어요. 그대로 시작해도 괜찮아요.</p>
-          <button class="btn-text" id="retryBtn">AI로 다시 분해 시도하기</button>
         </div>
       </div>
     </section>
@@ -458,7 +434,7 @@
   </div>
 </div>
 
-<p class="footer-note">에너지 버튼 선택, 체크박스 완료 표시, 타이머 시작/일시정지, 중단하기 버튼이 실제로 동작합니다. 위 탭으로 7개 상태를 바로 이동해 확인하세요. "저장 후 휴식"을 누르면 <b>절전 모드</b> 화면으로 넘어가고, 거기서 <b>복귀하기</b>를 눌러야 재진입 브리핑으로 이동합니다.</p>
+<p class="footer-note">에너지 버튼 선택, 체크박스 완료 표시, 타이머 시작/일시정지, 중단하기 버튼이 실제로 동작합니다. 위 탭으로 6개 상태를 바로 이동해 확인하세요. "저장 후 휴식"을 누르면 <b>절전 모드</b> 화면으로 넘어가고, 거기서 <b>복귀하기</b>를 눌러야 재진입 브리핑으로 이동합니다.</p>
 
 <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
 
@@ -671,8 +647,8 @@
   }
 </script>
 <script>
-  const screens = ["input","loading","fallback","tasks","interrupt","resting","reentry"];
-  const labels = {input:"1 입력", loading:"2 분석 중", fallback:"2b 분석 실패", tasks:"3 집중 중", interrupt:"5 중단", resting:"6 휴식 중", reentry:"7 재진입"};
+  const screens = ["input","loading","tasks","interrupt","resting","reentry"];
+  const labels = {input:"1 입력", loading:"2 나누는 중", tasks:"3 집중 중", interrupt:"5 중단", resting:"6 휴식 중", reentry:"7 재진입"};
   const nav = document.getElementById('nav');
   screens.forEach((s,i)=>{
     const b = document.createElement('button');
@@ -719,41 +695,95 @@
     toastTimer = setTimeout(()=> el.classList.remove('show'), 4500);
   }
 
-  // AI 분해가 실패했을 때 대신 쓰는 기본 마이크로 과제 (첫 단계는 항상 워밍업)
-  const DUMMY_MICRO_TASKS = [
-    { order_index: 1, title: '워밍업 · 관련 자료 훑어보고 주제 정하기', duration_min: 5 },
-    { order_index: 2, title: '핵심 내용 3줄로 정리하기', duration_min: 8 },
-    { order_index: 3, title: '첫 문단 초안 쓰기', duration_min: 10 },
-    { order_index: 4, title: '빠진 부분에 표시해 두기', duration_min: 7 },
-    { order_index: 5, title: '처음부터 한 번 읽고 다듬기', duration_min: 6 },
+  // ---------------------------------------------------------------------
+  // 과제 나누기 (규칙 기반)
+  // 같은 입력이면 항상 같은 결과가 나온다(랜덤 없음). 나중에 LLM으로 바꿀 때는 이 함수만
+  // 같은 모양으로 교체하면 된다: decomposeTask(title, energyLevel) → [{ order_index, title, duration_min }]
+  // (호출하는 쪽은 await로 받으니, 비동기 함수로 바꿔도 호출부는 그대로다.)
+  // ---------------------------------------------------------------------
+  const ENERGY_UNIT = { tired: '5분 이하', normal: '5~10분', great: '10~20분' };
+  const TITLE_MAX_CHARS = 20; // 문장 안에 넣는 과제명의 최대 길이 ('…' 포함)
+
+  // 컨디션별로 어떤 단계(0~5)를 쓰고 각각 몇 분인지
+  const STEP_PLAN = {
+    tired:  { steps: [0, 1, 3, 5],       minutes: [3, 5, 5, 3] },
+    normal: { steps: [0, 1, 2, 3, 5],    minutes: [5, 8, 10, 10, 5] },
+    great:  { steps: [0, 1, 2, 3, 4, 5], minutes: [10, 15, 20, 20, 15, 10] },
+  };
+
+  // 단계 문구. 조사(을/를, 이/가)가 과제명 받침에 따라 틀려지지 않도록 과제명을 따옴표로 감싸고
+  // 조사가 필요 없는 말(에 대해, 의, 에 필요한)만 이어 붙인다. 모든 문구는 "~기"로 끝난다.
+  const STEP_TEXT = {
+    general: [
+      (t) => `워밍업 · "${t}"에 대해 떠오르는 것 메모하기`,
+      (t) => `"${t}"에 필요한 자료·준비물 모으기`,
+      (t) => `"${t}"의 큰 순서 3단계로 적기`,
+      (t) => `"${t}"의 첫 단계 하나 해보기`,
+      (t) => `"${t}" 이어서 진행하기`,
+      (t) => `"${t}" 점검하고 다음 할 일 1가지 적기`,
+    ],
+    writing: [
+      (t) => `워밍업 · "${t}"에 대해 떠오르는 주제와 생각 메모하기`,
+      (t) => `"${t}"에 쓸 자료와 참고할 글 모으기`,
+      (t) => `"${t}"의 목차 3단계로 적기`,
+      (t) => `"${t}"의 첫 문단 하나 써 보기`,
+      (t) => `"${t}" 이어서 써 나가기`,
+      (t) => `"${t}" 읽어 보고 다음 할 일 1가지 적기`,
+    ],
+    coding: [
+      (t) => `워밍업 · "${t}"에 대해 만들고 싶은 기능 메모하기`,
+      (t) => `"${t}"에 필요한 개발 환경과 참고 자료 모으기`,
+      (t) => `"${t}"의 만들 순서 3단계로 적기`,
+      (t) => `"${t}"의 첫 단계 하나 코드로 해보기`,
+      (t) => `"${t}" 이어서 만들기`,
+      (t) => `"${t}" 실행해 보고 다음 할 일 1가지 적기`,
+    ],
+    study: [
+      (t) => `워밍업 · "${t}"에 대해 아는 것과 모르는 것 메모하기`,
+      (t) => `"${t}"에 필요한 교재·노트·준비물 모으기`,
+      (t) => `"${t}"의 공부 순서 3단계로 적기`,
+      (t) => `"${t}"의 첫 단계 하나 풀어 보기`,
+      (t) => `"${t}" 이어서 공부하기`,
+      (t) => `"${t}" 틀린 곳 점검하고 다음 할 일 1가지 적기`,
+    ],
+  };
+
+  // 여러 분류에 걸리면 위에서부터 먼저 맞는 것을 쓴다
+  const KEYWORDS = [
+    ['writing', ['발표', '보고서', '계획서', '글', '논문']],
+    ['coding', ['코딩', '프로그램', '개발', '앱', '웹']],
+    ['study', ['시험', '공부', '문제', '암기', '복습', '수행']],
   ];
 
-  const ENERGY_UNIT = { tired: '5분 이하', normal: '5~10분', great: '10~20분' };
-  const DECOMPOSE_TIMEOUT_MS = 25000;
-
-  // 서버리스 함수(/api/decompose)에 AI 분해를 요청한다. 어떤 이유로든 쓸 수 없으면 throw.
-  // Anthropic 키는 서버에만 있고, 브라우저는 과제명과 컨디션만 보낸다.
-  async function decomposeWithAI(taskTitle, energyLevel){
-    const controller = new AbortController();
-    const timer = setTimeout(()=> controller.abort(), DECOMPOSE_TIMEOUT_MS);
-    try {
-      const res = await fetch('/api/decompose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskTitle, energyLevel }),
-        signal: controller.signal,
-      });
-      if(!res.ok) throw new Error(`/api/decompose 응답 ${res.status}`);
-      const data = await res.json();
-      const tasks = data && data.tasks;
-      const valid = Array.isArray(tasks) && tasks.length > 0 && tasks.every(t =>
-        t && typeof t.title === 'string' && t.title.trim() !== '' &&
-        Number.isInteger(t.duration_min) && t.duration_min > 0);
-      if(!valid) throw new Error('/api/decompose 응답 형식이 올바르지 않아요.');
-      return tasks.map((t, i) => ({ order_index: i + 1, title: t.title.trim(), duration_min: t.duration_min }));
-    } finally {
-      clearTimeout(timer);
+  function detectCategory(title){
+    for(const [category, words] of KEYWORDS){
+      if(words.some(w => title.includes(w))) return category;
     }
+    return 'general';
+  }
+
+  // 이모지가 중간에 잘리지 않도록 눈에 보이는 글자(grapheme) 단위로 센다
+  const graphemeSegmenter = (typeof Intl !== 'undefined' && Intl.Segmenter)
+    ? new Intl.Segmenter('ko', { granularity: 'grapheme' }) : null;
+  function splitChars(text){
+    return graphemeSegmenter ? Array.from(graphemeSegmenter.segment(text), x => x.segment) : Array.from(text);
+  }
+  function shortenTitle(title){
+    const chars = splitChars(title);
+    if(chars.length <= TITLE_MAX_CHARS) return title;
+    return chars.slice(0, TITLE_MAX_CHARS - 1).join('').trimEnd() + '…';
+  }
+
+  function decomposeTask(title, energyLevel){
+    const clean = String(title == null ? '' : title).replace(/\s+/g, ' ').trim() || '과제';
+    const plan = Object.prototype.hasOwnProperty.call(STEP_PLAN, energyLevel) ? STEP_PLAN[energyLevel] : STEP_PLAN.normal;
+    const texts = STEP_TEXT[detectCategory(clean)]; // 분류는 줄이기 전의 전체 과제명으로 한다
+    const name = shortenTitle(clean);
+    return plan.steps.map((step, i) => ({
+      order_index: i + 1,
+      title: texts[step](name),
+      duration_min: plan.minutes[i],
+    }));
   }
 
   function buildTaskItem(m, i){
@@ -890,18 +920,7 @@
 
     let task = null;
     try {
-      // AI 호출이 오래 걸려도 DB에 빈 과제가 남지 않도록, 분해를 먼저 받고 그다음에 저장한다.
-      // AI가 실패해도 서비스가 멈추지 않도록 기본 과제로 대체한다.
-      let microTasks;
-      let usedFallback = false;
-      try {
-        microTasks = await decomposeWithAI(title, selectedEnergy);
-      } catch (aiErr) {
-        console.error('AI 분해 실패, 기본 과제로 대체해요:', aiErr);
-        microTasks = DUMMY_MICRO_TASKS;
-        usedFallback = true;
-      }
-
+      const microTasks = await decomposeTask(title, selectedEnergy); // 나중에 LLM으로 바꿔도 그대로 동작
       task = await createTask({ title, energyLevel: selectedEnergy });
       await saveMicroTasks(task.id, microTasks);
       const rows = await fetchMicroTasks(task.id);
@@ -909,7 +928,6 @@
       await statsReady;
       renderTasks(task, rows);
       showScreen('tasks');
-      if(usedFallback) showToast('AI 분해에 실패해서 기본 과제로 시작해요');
     } catch (err) {
       console.error('과제 저장/불러오기 실패:', err);
       if(task){
@@ -925,7 +943,6 @@
     }
   }
   document.getElementById('analyzeBtn').addEventListener('click', runAnalyze);
-  document.getElementById('retryBtn').addEventListener('click', runAnalyze);
 
   // real session tracking (so the numbers on later screens match what actually happened)
   // "이번 세션 완료"는 이 페이지를 연 뒤 직접 체크한 항목만 센다 (복원된 이전 완료분 제외)
