@@ -1054,9 +1054,12 @@
   // ---- 복귀 브리핑(재진입 화면) ----
   function formatFocusHM(sec){
     if(sec <= 0) return '0분';
-    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    if(sec < 60) return '1분 미만';
+    // 몰입 리포트(formatKo)와 같은 기준: 분 단위로 반올림
+    const total = Math.round(sec / 60);
+    const h = Math.floor(total / 60), m = total % 60;
     if(h > 0) return `${h}시간 ${m}분`;
-    return m === 0 ? '1분 미만' : `${m}분`;
+    return `${m}분`;
   }
 
   // "한 번 확인한 스냅샷"은 이 브라우저에 id를 기록해 두고 다시 띄우지 않는다.
