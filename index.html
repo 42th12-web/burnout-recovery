@@ -262,6 +262,41 @@
   .snapshot-card .k{font-size:11px;font-weight:800;color:var(--forest-600);text-transform:uppercase;letter-spacing:.05em;min-width:64px;padding-top:1px;}
   .snapshot-card .v{font-size:13px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere;min-width:0;}
 
+  /* --- 몰입 리포트 --- */
+  .cta-stack{display:flex;flex-direction:column;gap:10px;}
+  .btn-secondary{
+    appearance:none;border:1.5px solid var(--line);background:transparent;border-radius:14px;
+    color:var(--forest-600);font-family:'Manrope',sans-serif;font-weight:700;font-size:13.5px;
+    padding:13px;cursor:pointer;transition:.15s;
+  }
+  .btn-secondary:hover{border-color:var(--forest-500);background:var(--sage-100);}
+  .btn-secondary:focus-visible,.link-btn:focus-visible{outline:2px solid var(--forest-500);outline-offset:2px;}
+  .link-btn{appearance:none;border:none;background:none;padding:2px 0;font-family:'Manrope',sans-serif;font-weight:700;font-size:12px;color:var(--forest-600);cursor:pointer;}
+  .link-btn:hover{text-decoration:underline;}
+  #reportBody{display:flex;flex-direction:column;gap:18px;}
+  .report-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .report-cards .num{font-family:'Manrope',system-ui,sans-serif;font-weight:800;overflow-wrap:anywhere;}
+  .report-loading,.report-error{display:flex;flex-direction:column;align-items:center;gap:14px;padding:36px 0;color:var(--ink-soft);font-size:13px;text-align:center;line-height:1.6;}
+  .report-loading .ring{width:36px;height:36px;border-width:3px;}
+  .chart-block{display:flex;flex-direction:column;gap:6px;padding-top:16px;border-top:1px solid var(--line);}
+  .chart-block h3{font-size:15px;color:var(--forest-900);font-weight:600;}
+  .chart-block .cap{margin:0;font-size:11.5px;color:var(--ink-soft);line-height:1.5;}
+  .chart-svg{width:100%;height:auto;display:block;}
+  .chart-svg text{font-family:'Manrope',system-ui,sans-serif;}
+  .c-grid{stroke:var(--line);stroke-width:1;}
+  .c-axis{stroke:var(--ink-soft);stroke-width:1;opacity:.55;}
+  .c-tick,.c-xl,.c-axtitle{fill:var(--ink-soft);}
+  .c-tick{font-size:9.5px;}
+  .c-xl{font-size:10px;}
+  .c-axtitle{font-size:9.5px;font-weight:700;}
+  .c-val{fill:var(--forest-700);font-size:10px;font-weight:800;}
+  .c-bar{fill:var(--forest-500);}
+  .c-bar.interrupted{fill:var(--amber-500);stroke:var(--clay-600);stroke-width:1.5;stroke-dasharray:3 2;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);font-weight:600;}
+  .legend .item{display:inline-flex;align-items:center;gap:6px;}
+  .legend .sw{width:12px;height:12px;border-radius:3px;background:var(--forest-500);display:inline-block;box-sizing:border-box;}
+  .legend .sw.interrupted{background:var(--amber-500);border:1.5px dashed var(--clay-600);}
+
   .empty-note{margin:0;padding:18px 4px;font-size:12.5px;color:var(--ink-soft);text-align:center;line-height:1.6;}
   .toast{
     position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);
@@ -281,7 +316,7 @@
 </style>
 
 <div class="page-head">
-  <div class="eyebrow">UI 워크스루 · 6개 화면 상태</div>
+  <div class="eyebrow">UI 워크스루 · 7개 화면 상태</div>
   <h1>다시, 책상</h1>
   <p>과제 입력부터 재진입 브리핑까지 실제 인터랙션이 동작하는 화면입니다. 지난 검토에서 나온 수정사항 — 타이머·예상시간 일치, 워밍업 표시, 진행 중 항목 강조, 비상 휴식 정의, 오늘 누적 통계 분리, 로딩 상태 — 을 반영했습니다.</p>
 </div>
@@ -312,7 +347,10 @@
           </div>
         </div>
         <div class="spacer"></div>
-        <button class="btn-primary" id="analyzeBtn">✏️ 과제 나누기</button>
+        <div class="cta-stack">
+          <button class="btn-primary" id="analyzeBtn">✏️ 과제 나누기</button>
+          <button class="btn-secondary" id="reportBtnInput" type="button">내 몰입 리포트</button>
+        </div>
       </div>
     </section>
 
@@ -427,14 +465,31 @@
 
         <p class="quote-line">"지금 잠을 자면 꿈을 꾸지만, 지금 5분만 채우면 꿈에 가까워져요."</p>
         <div class="spacer"></div>
-        <button class="btn-primary" id="reentryStartBtn">이어서 시작하기</button>
+        <div class="cta-stack">
+          <button class="btn-primary" id="reentryStartBtn">이어서 시작하기</button>
+          <button class="btn-secondary" id="reportBtnReentry" type="button">내 몰입 리포트</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 몰입 리포트 -->
+    <section class="screen" data-screen="report">
+      <div class="screen-pad" style="gap:18px;">
+        <div class="topline"><span><span class="dot"></span>몰입 리포트</span><button class="link-btn" id="reportBackTop" type="button">← 돌아가기</button></div>
+        <div class="greet">
+          <h2>내 몰입 리포트</h2>
+          <p>짧게 앉았던 시간도 모두 여기에 쌓여 있어요.</p>
+        </div>
+        <div id="reportBody" aria-live="polite"></div>
+        <div class="spacer"></div>
+        <button class="btn-secondary" id="reportBackBottom" type="button">돌아가기</button>
       </div>
     </section>
 
   </div>
 </div>
 
-<p class="footer-note">에너지 버튼 선택, 체크박스 완료 표시, 타이머 시작/일시정지, 중단하기 버튼이 실제로 동작합니다. 위 탭으로 6개 상태를 바로 이동해 확인하세요. "저장 후 휴식"을 누르면 <b>절전 모드</b> 화면으로 넘어가고, 거기서 <b>복귀하기</b>를 눌러야 재진입 브리핑으로 이동합니다.</p>
+<p class="footer-note">에너지 버튼 선택, 체크박스 완료 표시, 타이머 시작/일시정지, 중단하기 버튼이 실제로 동작합니다. 위 탭으로 7개 상태를 바로 이동해 확인하세요. "저장 후 휴식"을 누르면 <b>절전 모드</b> 화면으로 넘어가고, 거기서 <b>복귀하기</b>를 눌러야 재진입 브리핑으로 이동합니다.</p>
 
 <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
 
@@ -635,6 +690,36 @@
     return data;
   }
 
+  // 몰입 리포트용: 끝난(ended_at 있음) 세션 중 집중 시간이 0보다 큰 것만. 한 번에 최대 1000행이라 나눠서 모두 가져온다.
+  // 본인 것만 오는 것은 기존 RLS가 보장한다.
+  async function fetchReportSessions() {
+    const PAGE = 1000;
+    const rows = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabaseClient
+        .from('sessions')
+        .select('id, started_at, ended_at, focus_duration_sec, was_interrupted')
+        .not('ended_at', 'is', null)
+        .gt('focus_duration_sec', 0)
+        .order('started_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      rows.push(...data);
+      if (data.length < PAGE) break;
+    }
+    return rows;
+  }
+
+  async function fetchDoneMicroTaskCount() {
+    const { count, error } = await supabaseClient
+      .from('micro_tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_done', true);
+    if (error) throw error;
+    return count || 0;
+  }
+
   async function upsertUserStats({ avgFocusDurationSec, recommendedTimeboxSec }) {
     const userId = await getCurrentUserId();
     const { error } = await supabaseClient.from('user_stats').upsert({
@@ -647,8 +732,8 @@
   }
 </script>
 <script>
-  const screens = ["input","loading","tasks","interrupt","resting","reentry"];
-  const labels = {input:"1 입력", loading:"2 나누는 중", tasks:"3 집중 중", interrupt:"5 중단", resting:"6 휴식 중", reentry:"7 재진입"};
+  const screens = ["input","loading","tasks","interrupt","resting","reentry","report"];
+  const labels = {input:"1 입력", loading:"2 나누는 중", tasks:"3 집중 중", interrupt:"5 중단", resting:"6 휴식 중", reentry:"7 재진입", report:"몰입 리포트"};
   const nav = document.getElementById('nav');
   screens.forEach((s,i)=>{
     const b = document.createElement('button');
@@ -656,6 +741,7 @@
     b.dataset.target = s;
     if(i===0) b.classList.add('active');
     b.addEventListener('click', ()=>{
+      if(s === 'report'){ openReport(); return; }
       showScreen(s);
       if(s === 'reentry') loadReentry().catch(err => console.error('복귀 정보 불러오기 실패:', err));
     });
@@ -1328,6 +1414,304 @@
 
   render();
   updateTimerControls();
+
+  // ---------------------------------------------------------------------
+  // 몰입 리포트
+  // 집계는 buildReport() 하나(순수 함수)에서 하고, 그리기는 DOM/SVG API로만 한다(innerHTML 사용 안 함).
+  // 날짜·시각 구분은 모두 브라우저 로컬 시간 기준이다.
+  // ---------------------------------------------------------------------
+  const REPORT_EMPTY_TEXT = '아직 기록이 없어요. 한 번 집중해 보면 여기에 쌓여요';
+  const HOUR_CHART_MIN_SESSIONS = 5;
+  const HOUR_BUCKETS = [
+    { name: '새벽', from: 0, to: 6 },
+    { name: '오전', from: 6, to: 12 },
+    { name: '오후', from: 12, to: 18 },
+    { name: '저녁', from: 18, to: 24 },
+  ];
+  const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+  const reportBody = document.getElementById('reportBody');
+  let reportReturnTo = 'input';
+  let reportReq = 0;
+
+  // 1시간 20분 / 12분 / 45초
+  function formatKo(sec){
+    sec = Math.max(0, Math.round(sec));
+    if(sec < 60) return `${sec}초`;
+    const total = Math.round(sec / 60);
+    const h = Math.floor(total / 60), m = total % 60;
+    if(h === 0) return `${total}분`;
+    return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
+  }
+  // 막대 위 값 라벨: 좁은 칸에서 겹치지 않도록 "1시간 / 20분"처럼 줄로 나눈다
+  function valueLines(sec){
+    if(sec <= 0) return ['0분'];
+    if(sec < 60) return [`${Math.round(sec)}초`];
+    const total = Math.round(sec / 60);
+    if(total < 60) return [`${total}분`];
+    const h = Math.floor(total / 60), m = total % 60;
+    return m === 0 ? [`${h}시간`] : [`${h}시간`, `${m}분`];
+  }
+  function tickLabel(sec){
+    if(sec === 0) return '0';
+    if(sec < 3600) return `${sec / 60}분`;
+    const h = Math.floor(sec / 3600), m = (sec % 3600) / 60;
+    return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
+  }
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const dayKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+  // rawSessions: sessions 행 배열. 끝나지 않았거나(ended_at 없음) 집중 시간이 0 이하/없음인 세션은 여기서도 한 번 더 걸러낸다.
+  function buildReport(rawSessions, doneCount, now){
+    const sessions = rawSessions
+      .filter(r => r && r.ended_at && Number(r.focus_duration_sec) > 0 && !Number.isNaN(new Date(r.started_at).getTime()))
+      .map(r => ({ start: new Date(r.started_at), sec: Number(r.focus_duration_sec), interrupted: r.was_interrupted === true }))
+      .sort((a, b) => a.start - b.start);
+    if(sessions.length === 0) return { empty: true };
+
+    const totalSec = sessions.reduce((sum, x) => sum + x.sec, 0);
+    const avgSec = Math.round(totalSec / sessions.length);
+
+    // 최근 7일(오늘 포함), 기록 없는 날은 0
+    const days = [];
+    for(let i = 6; i >= 0; i--) days.push({ date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - i), sec: 0 });
+    const byKey = new Map(days.map(d => [dayKey(d.date), d]));
+    for(const x of sessions){
+      const day = byKey.get(dayKey(x.start));
+      if(day) day.sec += x.sec;
+    }
+
+    // 시작 시각대별 평균
+    const buckets = HOUR_BUCKETS.map(b => ({ ...b, n: 0, sumSec: 0, avgSec: 0 }));
+    for(const x of sessions){
+      const h = x.start.getHours();
+      const b = buckets.find(k => h >= k.from && h < k.to);
+      b.n += 1; b.sumSec += x.sec;
+    }
+    buckets.forEach(b => { b.avgSec = b.n ? Math.round(b.sumSec / b.n) : 0; });
+
+    return {
+      empty: false, totalSec, count: sessions.length, avgSec, doneCount,
+      days,
+      recent: sessions.slice(-10), // 오래된 → 최근 순서
+      hours: { enough: sessions.length >= HOUR_CHART_MIN_SESSIONS, buckets },
+    };
+  }
+
+  // ---- SVG 막대그래프 ----
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(name, attrs, text){
+    const el = document.createElementNS(SVG_NS, name);
+    for(const k of Object.keys(attrs)) el.setAttribute(k, attrs[k]);
+    if(text !== undefined) el.textContent = text;
+    return el;
+  }
+  function niceStep(maxSec){
+    const steps = [60, 120, 300, 600, 900, 1200, 1800, 3600, 7200, 10800, 14400, 21600, 28800, 43200, 86400];
+    return steps.find(st => Math.ceil(maxSec / st) <= 4) || 86400;
+  }
+
+  // bars: [{ sec, valueLines:[], lines:[x축 라벨 줄들], interrupted?, kind? }]
+  function drawBarChart({ bars, yTitle, xTitle, ariaLabel }){
+    const W = 340, LEFT = 54, RIGHT = 6, TOP = 46, PLOT_H = 124, LH = 12; // LH: 두 줄 라벨의 줄 간격
+    const innerW = W - LEFT - RIGHT;
+    const xLines = Math.max(...bars.map(b => b.lines.length));
+    const lastLabelY = TOP + PLOT_H + 14 + (xLines - 1) * LH;
+    const H = lastLabelY + 8 + 12;
+    const maxSec = Math.max(60, ...bars.map(b => b.sec));
+    const step = niceStep(maxSec);
+    const niceMax = Math.ceil(maxSec / step) * step;
+
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg', role: 'img', 'aria-label': ariaLabel });
+    svg.appendChild(svgEl('text', { x: 2, y: 10, class: 'c-axtitle' }, yTitle));
+    for(let t = 0; t <= niceMax; t += step){
+      const y = TOP + PLOT_H - (t / niceMax) * PLOT_H;
+      svg.appendChild(svgEl('line', { x1: LEFT, x2: W - RIGHT, y1: y, y2: y, class: t === 0 ? 'c-axis' : 'c-grid' }));
+      svg.appendChild(svgEl('text', { x: LEFT - 6, y: y + 3.5, 'text-anchor': 'end', class: 'c-tick' }, tickLabel(t)));
+    }
+    const slotW = innerW / bars.length;
+    const barW = Math.min(slotW * 0.6, 34);
+    bars.forEach((b, i) => {
+      const cx = LEFT + slotW * i + slotW / 2;
+      const h = b.sec > 0 ? Math.max(2, (b.sec / niceMax) * PLOT_H) : 0;
+      const y = TOP + PLOT_H - h;
+      if(h > 0){
+        svg.appendChild(svgEl('rect', {
+          x: cx - barW / 2, y, width: barW, height: h, rx: 3,
+          class: 'c-bar' + (b.interrupted ? ' interrupted' : ''),
+          'data-sec': b.sec, 'data-kind': b.kind || '',
+        }));
+      }
+      b.valueLines.forEach((line, k) => {
+        svg.appendChild(svgEl('text', { x: cx, y: y - 5 - (b.valueLines.length - 1 - k) * LH, 'text-anchor': 'middle', class: 'c-val' }, line));
+      });
+      b.lines.forEach((line, k) => {
+        svg.appendChild(svgEl('text', { x: cx, y: TOP + PLOT_H + 14 + k * LH, 'text-anchor': 'middle', class: 'c-xl' }, line));
+      });
+    });
+    svg.appendChild(svgEl('text', { x: LEFT + innerW / 2, y: H - 3, 'text-anchor': 'middle', class: 'c-axtitle' }, xTitle));
+    return svg;
+  }
+
+  function chartBlock(title, caption, ...children){
+    const block = document.createElement('section');
+    block.className = 'chart-block';
+    const h = document.createElement('h3');
+    h.textContent = title;
+    block.appendChild(h);
+    if(caption){
+      const p = document.createElement('p');
+      p.className = 'cap';
+      p.textContent = caption;
+      block.appendChild(p);
+    }
+    children.forEach(c => block.appendChild(c));
+    return block;
+  }
+  function noteEl(text){
+    const p = document.createElement('p');
+    p.className = 'empty-note';
+    p.textContent = text;
+    return p;
+  }
+  function legendEl(){
+    const wrap = document.createElement('div');
+    wrap.className = 'legend';
+    for(const [cls, text] of [['', '끝까지 마친 세션'], ['interrupted', '중단한 세션']]){
+      const item = document.createElement('span');
+      item.className = 'item';
+      const sw = document.createElement('span');
+      sw.className = 'sw' + (cls ? ` ${cls}` : '');
+      sw.setAttribute('aria-hidden', 'true');
+      item.append(sw, text);
+      wrap.appendChild(item);
+    }
+    return wrap;
+  }
+
+  function renderReport(r){
+    if(r.empty){ reportBody.replaceChildren(noteEl(REPORT_EMPTY_TEXT)); return; }
+
+    // 1. 숫자 카드 4개
+    const cards = document.createElement('div');
+    cards.className = 'report-cards';
+    for(const [key, label, value] of [
+      ['total', '총 집중 시간', formatKo(r.totalSec)],
+      ['count', '집중 세션 수', `${r.count}번`],
+      ['avg', '평균 집중 시간', formatKo(r.avgSec)],
+      ['done', '완료한 마이크로 과제', `${r.doneCount}개`],
+    ]){
+      const tile = document.createElement('div');
+      tile.className = 'stat-tile';
+      tile.dataset.card = key;
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = value;
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = label;
+      tile.append(num, lbl);
+      cards.appendChild(tile);
+    }
+
+    // 2. 최근 7일 일별 집중 시간
+    const dayBars = r.days.map((d, i) => ({
+      sec: d.sec, valueLines: valueLines(d.sec), kind: 'day',
+      lines: [`${d.date.getMonth() + 1}/${d.date.getDate()}`, i === r.days.length - 1 ? '오늘' : WEEKDAY_KO[d.date.getDay()]],
+    }));
+    const dayChart = drawBarChart({
+      bars: dayBars, yTitle: '하루 집중 시간', xTitle: '날짜',
+      ariaLabel: '최근 7일 하루 집중 시간. ' + r.days.map(d => `${d.date.getMonth() + 1}월 ${d.date.getDate()}일 ${formatKo(d.sec)}`).join(', '),
+    });
+
+    // 3. 최근 10개 세션 추이 (중단은 다른 색 + 점선 테두리)
+    const recentBars = r.recent.map(x => ({
+      sec: x.sec, valueLines: valueLines(x.sec), interrupted: x.interrupted, kind: x.interrupted ? 'interrupted' : 'complete',
+      lines: [`${x.start.getDate()}일`, `${x.start.getHours()}시`],
+    }));
+    const recentChart = drawBarChart({
+      bars: recentBars, yTitle: '세션 집중 시간', xTitle: '시작한 날짜·시각 (왼쪽이 오래된 기록)',
+      ariaLabel: `최근 ${r.recent.length}번의 집중. ` + r.recent.map(x => `${x.start.getMonth() + 1}월 ${x.start.getDate()}일 ${x.start.getHours()}시 ${formatKo(x.sec)}${x.interrupted ? ' 중단' : ''}`).join(', '),
+    });
+
+    // 4. 시작 시각대별 평균 (대상 세션 5개 미만이면 문구)
+    const hourContent = r.hours.enough
+      ? drawBarChart({
+          bars: r.hours.buckets.map(b => ({
+            sec: b.avgSec, valueLines: b.n ? valueLines(b.avgSec) : ['—'], kind: 'hour',
+            lines: [b.name, `${b.from}~${b.to}시`, `${b.n}회`],
+          })),
+          yTitle: '평균 집중 시간', xTitle: '시작한 시각대',
+          ariaLabel: '시작 시각대별 평균 집중 시간. ' + r.hours.buckets.map(b => `${b.name} ${b.from}시부터 ${b.to}시, ${b.n ? formatKo(b.avgSec) : '기록 없음'}`).join(', '),
+        })
+      : noteEl('기록이 더 쌓이면 보여요');
+
+    reportBody.replaceChildren(
+      cards,
+      chartBlock('최근 7일, 하루 집중 시간', '기록이 없는 날은 0분으로 보여요.', dayChart),
+      chartBlock('최근 10번의 집중', '중단한 세션도 그만큼 집중한 시간이에요.', recentChart, legendEl()),
+      chartBlock('언제 오래 집중했나요?', '시작한 시각대별 평균 집중 시간이에요.', hourContent),
+    );
+  }
+
+  function renderReportLoading(){
+    const wrap = document.createElement('div');
+    wrap.className = 'report-loading';
+    const ring = document.createElement('div');
+    ring.className = 'ring';
+    ring.setAttribute('role', 'status');
+    ring.setAttribute('aria-label', '불러오는 중');
+    const p = document.createElement('p');
+    p.style.margin = '0';
+    p.textContent = '리포트를 불러오는 중이에요';
+    wrap.append(ring, p);
+    reportBody.replaceChildren(wrap);
+  }
+  function renderReportError(){
+    const wrap = document.createElement('div');
+    wrap.className = 'report-error';
+    const p = document.createElement('p');
+    p.style.margin = '0';
+    p.textContent = '리포트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn-secondary';
+    retry.id = 'reportRetryBtn';
+    retry.textContent = '다시 불러오기';
+    retry.addEventListener('click', loadReport);
+    wrap.append(p, retry);
+    reportBody.replaceChildren(wrap);
+  }
+
+  async function loadReport(){
+    const req = ++reportReq;
+    renderReportLoading();
+    try {
+      const [sessions, doneCount] = await Promise.all([fetchReportSessions(), fetchDoneMicroTaskCount()]);
+      if(req !== reportReq) return; // 그 사이 다시 열었거나 닫았으면 오래된 결과는 버린다
+      renderReport(buildReport(sessions, doneCount, new Date()));
+    } catch (err) {
+      if(req !== reportReq) return;
+      console.error('몰입 리포트 불러오기 실패:', err);
+      showToast('몰입 리포트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      renderReportError();
+    }
+  }
+
+  function openReport(){
+    const prev = (document.querySelector('.screen.active') || {}).dataset;
+    const prevName = prev && prev.screen;
+    if(prevName && prevName !== 'report' && prevName !== 'loading') reportReturnTo = prevName;
+    showScreen('report');
+    loadReport();
+  }
+  function closeReport(){
+    reportReq++;
+    showScreen(reportReturnTo);
+  }
+  document.getElementById('reportBtnInput').addEventListener('click', openReport);
+  document.getElementById('reportBtnReentry').addEventListener('click', openReport);
+  document.getElementById('reportBackTop').addEventListener('click', closeReport);
+  document.getElementById('reportBackBottom').addEventListener('click', closeReport);
 
   statsReady = loadUserStats().catch(err => {
     console.error('추천 시간 불러오기 실패:', err);
