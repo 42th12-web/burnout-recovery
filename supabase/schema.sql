@@ -51,8 +51,11 @@ create table if not exists public.snapshots (
   last_active_micro_task_id uuid references public.micro_tasks (id) on delete set null,
   note_text                 text,
   reentry_action            text not null,
+  stop_reason               text,  -- 중단 이유: 'tired' | 'distracted' | 'stuck' | 'urgent' | null(고르지 않음)
   created_at                timestamptz not null default now()
 );
+-- 이미 만들어 둔 DB에는 컬럼만 추가합니다 (여러 번 실행해도 안전).
+alter table public.snapshots add column if not exists stop_reason text;
 create index if not exists snapshots_session_id_idx on public.snapshots (session_id);
 
 -- ---------------------------------------------------------------------------
