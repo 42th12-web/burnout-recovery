@@ -140,6 +140,17 @@
   .energy-btn.selected .lbl{color:var(--forest-700);}
   .energy-btn:focus-visible{outline:2px solid var(--forest-500);outline-offset:2px;}
 
+  .type-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
+  .type-btn{
+    border:1.5px solid var(--line);background:var(--sage-50);border-radius:14px;
+    padding:10px 4px;min-height:46px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:.15s ease;font-family:'Manrope',sans-serif;
+    font-size:12px;font-weight:700;color:var(--ink-soft);line-height:1.3;text-align:center;
+    word-break:keep-all;overflow-wrap:anywhere;
+  }
+  .type-btn[aria-pressed="true"]{border-color:var(--forest-500);background:var(--moss-300);color:var(--forest-700);}
+  .type-btn:focus-visible{outline:2px solid var(--forest-500);outline-offset:2px;}
+
   .btn-primary{
     appearance:none;border:none;border-radius:14px;background:var(--forest-600);
     color:var(--sage-50);font-family:'Manrope',sans-serif;font-weight:700;font-size:14.5px;
@@ -339,6 +350,15 @@
           <input id="taskInput" type="text" maxlength="100" placeholder="예: 물리 수행평가 보고서 작성" />
         </div>
         <div class="field">
+          <label id="typeLabel">과제 종류</label>
+          <div class="type-row" id="typeRow" role="group" aria-labelledby="typeLabel">
+            <button class="type-btn" type="button" data-t="auto" aria-pressed="true">자동</button>
+            <button class="type-btn" type="button" data-t="writing" aria-pressed="false">보고서·<wbr>글쓰기</button>
+            <button class="type-btn" type="button" data-t="problem" aria-pressed="false">문제 풀이</button>
+            <button class="type-btn" type="button" data-t="memorize" aria-pressed="false">암기</button>
+          </div>
+        </div>
+        <div class="field">
           <label>지금 나의 상태는?</label>
           <div class="energy-row" id="energyRow">
             <button class="energy-btn" data-e="tired"><span class="emo">🥱</span><span class="lbl">피곤함</span></button>
@@ -361,7 +381,7 @@
         <div class="center-stack">
           <div class="ring" role="status" aria-label="나누는 중"></div>
           <h3>과제를 나누고 있어요</h3>
-          <p id="loadingDesc">"물리 수행평가 보고서 작성"을 보통 컨디션에 맞는<br>5~10분 단위 행동으로 나누는 중이에요</p>
+          <p id="loadingDesc">"물리 수행평가 보고서 작성"을 보통 컨디션에 맞는<br>작은 행동으로 나누는 중이에요</p>
         </div>
       </div>
     </section>
@@ -770,6 +790,15 @@
     selectedEnergy = btn.dataset.e;
   });
 
+  // 과제 종류 선택: 'auto' | 'writing' | 'problem' | 'memorize'. DB에는 저장하지 않고 새로고침하면 '자동'으로 돌아간다.
+  let selectedTaskType = 'auto';
+  document.getElementById('typeRow').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.type-btn');
+    if(!btn) return;
+    document.querySelectorAll('.type-btn').forEach(b=>b.setAttribute('aria-pressed', String(b === btn)));
+    selectedTaskType = btn.dataset.t;
+  });
+
   // 에러 알림 (화면 토스트)
   let toastTimer = null;
   function showToast(message, kind = 'error'){
@@ -784,17 +813,35 @@
   // ---------------------------------------------------------------------
   // 과제 나누기 (규칙 기반)
   // 같은 입력이면 항상 같은 결과가 나온다(랜덤 없음). 나중에 LLM으로 바꿀 때는 이 함수만
-  // 같은 모양으로 교체하면 된다: decomposeTask(title, energyLevel) → [{ order_index, title, duration_min }]
+  // 같은 모양으로 교체하면 된다: decomposeTask(title, energyLevel, taskType) → [{ order_index, title, duration_min }]
   // (호출하는 쪽은 await로 받으니, 비동기 함수로 바꿔도 호출부는 그대로다.)
   // ---------------------------------------------------------------------
-  const ENERGY_UNIT = { tired: '5분 이하', normal: '5~10분', great: '10~20분' };
   const TITLE_MAX_CHARS = 20; // 문장 안에 넣는 과제명의 최대 길이 ('…' 포함)
 
-  // 컨디션별로 어떤 단계(0~5)를 쓰고 각각 몇 분인지
+  // 컨디션별로 어떤 단계(0~5)를 쓰고 각각 몇 분인지 (기본 시간표)
   const STEP_PLAN = {
     tired:  { steps: [0, 1, 3, 5],       minutes: [3, 5, 5, 3] },
     normal: { steps: [0, 1, 2, 3, 5],    minutes: [5, 8, 10, 10, 5] },
     great:  { steps: [0, 1, 2, 3, 4, 5], minutes: [10, 15, 20, 20, 15, 10] },
+  };
+  // 과제 종류별로 시간표를 덮어쓸 수 있다. 여기에 없는 종류(general/coding/study)와 컨디션은 기본 STEP_PLAN을 쓴다.
+  // 항목 수와 단계 번호는 모든 종류에서 같고, 시간(minutes)만 종류의 성격에 맞게 다르다.
+  const STEP_PLAN_BY_TYPE = {
+    writing: { // 글을 쓰는 단계(첫 문단·이어 쓰기)에 시간을 더 준다
+      tired:  { steps: [0, 1, 3, 5],       minutes: [3, 5, 8, 3] },
+      normal: { steps: [0, 1, 2, 3, 5],    minutes: [5, 8, 8, 15, 5] },
+      great:  { steps: [0, 1, 2, 3, 4, 5], minutes: [5, 10, 10, 20, 25, 10] },
+    },
+    problem: { // 준비는 짧게, 풀이에 시간을 쓴다
+      tired:  { steps: [0, 1, 3, 5],       minutes: [3, 3, 5, 3] },
+      normal: { steps: [0, 1, 2, 3, 5],    minutes: [3, 3, 3, 10, 8] },
+      great:  { steps: [0, 1, 2, 3, 4, 5], minutes: [5, 5, 5, 10, 25, 10] },
+    },
+    memorize: { // 덩어리로 나눠 외우고 떠올려 보는 단계에 시간을 쓴다
+      tired:  { steps: [0, 1, 3, 5],       minutes: [3, 5, 5, 3] },
+      normal: { steps: [0, 1, 2, 3, 5],    minutes: [3, 5, 3, 8, 5] },
+      great:  { steps: [0, 1, 2, 3, 4, 5], minutes: [5, 10, 5, 10, 20, 10] },
+    },
   };
 
   // 단계 문구. 조사(을/를, 이/가)가 과제명 받침에 따라 틀려지지 않도록 과제명을 따옴표로 감싸고
@@ -823,6 +870,22 @@
       (t) => `"${t}"의 첫 단계 하나 코드로 해보기`,
       (t) => `"${t}" 이어서 만들기`,
       (t) => `"${t}" 실행해 보고 다음 할 일 1가지 적기`,
+    ],
+    problem: [
+      (t) => `워밍업 · "${t}"의 오늘 풀 범위와 문제 수 정하기`,
+      (t) => `"${t}"에 필요한 교재·공식·노트 펼쳐 두기`,
+      (t) => `"${t}"의 풀 순서를 쉬운 문제부터 정하기`,
+      (t) => `"${t}"의 첫 문제 하나 풀어 보기`,
+      (t) => `"${t}" 이어서 문제 풀기`,
+      (t) => `"${t}" 틀린 문제 표시하고 다음 할 일 1가지 적기`,
+    ],
+    memorize: [
+      (t) => `워밍업 · "${t}"의 외울 범위 정하고 한 번 훑어보기`,
+      (t) => `"${t}"의 외울 내용을 카드나 노트로 정리하기`,
+      (t) => `"${t}"의 외울 내용 3덩어리로 나누기`,
+      (t) => `"${t}"의 첫 덩어리 가리고 떠올려 보기`,
+      (t) => `"${t}"의 나머지 덩어리 이어서 외우기`,
+      (t) => `"${t}" 못 떠올린 것 다시 확인하고 다음 할 일 1가지 적기`,
     ],
     study: [
       (t) => `워밍업 · "${t}"에 대해 아는 것과 모르는 것 메모하기`,
@@ -860,10 +923,17 @@
     return chars.slice(0, TITLE_MAX_CHARS - 1).join('').trimEnd() + '…';
   }
 
-  function decomposeTask(title, energyLevel){
+  // taskType: 'auto'(키워드로 판별) | 'writing' | 'problem' | 'memorize'. 그 밖의 값은 'auto'로 본다.
+  const PICKABLE_TYPES = ['writing', 'problem', 'memorize'];
+
+  function decomposeTask(title, energyLevel, taskType = 'auto'){
     const clean = String(title == null ? '' : title).replace(/\s+/g, ' ').trim() || '과제';
-    const plan = Object.prototype.hasOwnProperty.call(STEP_PLAN, energyLevel) ? STEP_PLAN[energyLevel] : STEP_PLAN.normal;
-    const texts = STEP_TEXT[detectCategory(clean)]; // 분류는 줄이기 전의 전체 과제명으로 한다
+    const energy = Object.prototype.hasOwnProperty.call(STEP_PLAN, energyLevel) ? energyLevel : 'normal';
+    // 분류는 줄이기 전의 전체 과제명으로 한다
+    const category = PICKABLE_TYPES.includes(taskType) ? taskType : detectCategory(clean);
+    const override = STEP_PLAN_BY_TYPE[category];
+    const plan = (override && override[energy]) || STEP_PLAN[energy];
+    const texts = STEP_TEXT[category];
     const name = shortenTitle(clean);
     return plan.steps.map((step, i) => ({
       order_index: i + 1,
@@ -1005,12 +1075,12 @@
     analyzeBtn.disabled = true;
     await abandonOpenSession();
     document.getElementById('loadingDesc').textContent =
-      `"${title}"을(를) ${ENERGY_LABEL[selectedEnergy]} 컨디션에 맞는 ${ENERGY_UNIT[selectedEnergy]} 단위 행동으로 나누는 중이에요`;
+      `"${title}"을(를) ${ENERGY_LABEL[selectedEnergy]} 컨디션에 맞는 작은 행동으로 나누는 중이에요`;
     showScreen('loading');
 
     let task = null;
     try {
-      const microTasks = await decomposeTask(title, selectedEnergy); // 나중에 LLM으로 바꿔도 그대로 동작
+      const microTasks = await decomposeTask(title, selectedEnergy, selectedTaskType); // 나중에 LLM으로 바꿔도 그대로 동작
       task = await createTask({ title, energyLevel: selectedEnergy });
       await saveMicroTasks(task.id, microTasks);
       const rows = await fetchMicroTasks(task.id);
